@@ -1,0 +1,49 @@
+package rsa
+
+import (
+    "big"
+    "bytes"
+    "io"
+    by "github.com/aws/amazon-ssm-agent/agent/iospecs/bytes"
+)
+
+type PublicKey struct {
+    N *big.Int // modulus
+    E int      // public exponent
+}
+
+pred (pk *PublicKey) Mem() {
+    acc(pk) &&
+    (pk.N != nil ==> pk.N.Mem())
+}
+
+decreases _
+pure func (pk *PublicKey) Abs() by.Bytes
+
+
+type PrivateKey struct {
+	PublicKey            // public part.
+	D         *big.Int   // private exponent
+	Primes    []*big.Int // prime factors of N, has >= 2 elements.
+
+	additionalStructFields int // hidden
+}
+
+pred (sk *PrivateKey) Mem() {
+    acc(&sk.D) && acc(&sk.Primes) && acc(&sk.additionalStructFields) && 
+    sk.PublicKey.Mem() &&
+    (sk.D != nil ==> sk.D.Mem()) &&
+    (forall i int :: { sk.Primes[i] } 0 <= i && i < len(sk.Primes) ==> acc(&sk.Primes[i]) && sk.Primes[i].Mem())
+}
+
+requires noPerm < p
+preserves acc(random.Mem(), p)
+ensures err == nil ==> sk.Mem()
+ensures err != nil ==> err.ErrorMem()
+func GenerateKey(random io.Reader, bits int, ghost p perm) (sk *PrivateKey, err error)
+
+requires noPerm < p
+preserves acc(random.Mem(), p) && acc(pub.Mem(), p) && acc(bytes.SliceMem(msg), p)
+ensures err == nil ==> bytes.SliceMem(ciphertext)
+ensures err != nil ==> err.ErrorMem()
+func EncryptPKCS1v15(random io.Reader, pub *PublicKey, msg []byte, ghost p perm) (ciphertext []byte, err error)

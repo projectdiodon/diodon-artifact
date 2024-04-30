@@ -1,0 +1,3 @@
+options:
+    reports-dir: "bad-dir/example-report"
+    report-paths: true
