@@ -1,0 +1,119 @@
+package datastream
+
+import (
+	"bytes"
+    ctx "github.com/aws/amazon-ssm-agent/agent/context"
+    logger "github.com/aws/amazon-ssm-agent/agent/log"
+	mgsContracts "github.com/aws/amazon-ssm-agent/agent/session/contracts"
+	"github.com/aws/amazon-ssm-agent/agent/session/crypto"
+    "github.com/aws/amazon-ssm-agent/agent/task"
+	"github.com/aws/amazon-ssm-agent/agent/iospecs/abs"
+	by "github.com/aws/amazon-ssm-agent/agent/iospecs/bytes"
+	ft "github.com/aws/amazon-ssm-agent/agent/iospecs/fact"
+	iospec "github.com/aws/amazon-ssm-agent/agent/iospecs/iospec"
+	pl "github.com/aws/amazon-ssm-agent/agent/iospecs/place"
+	. "github.com/aws/amazon-ssm-agent/agent/iospecs/pub"
+	tm "github.com/aws/amazon-ssm-agent/agent/iospecs/term"
+)
+
+type DataStream struct {
+    context    ctx.T
+	nonEmptyStruct int
+}
+
+pred (datastream *DataStream) Mem() {
+	acc(datastream) &&
+	acc(datastream.context.Mem(), _)
+}
+
+type Calls interface {
+	pred Inv()
+}
+
+requires cs != nil
+requires msg != nil ==> msg.Mem()
+preserves cs.Inv()
+ensures err != nil ==>  err.ErrorMem()
+func StreamDataHandlerSpec(ghost cs Calls, msg *mgsContracts.AgentMessage) (err error)
+
+requires context != nil ==> acc(context.Mem(), _)
+requires cancelFlag != nil ==> acc(cancelFlag.Mem(), _)
+// the following precondition allows `NewDataStream` or a started go routine to invoke `streamDataHandler`:
+requires cs != nil && cs.Inv() && streamDataHandler implements StreamDataHandlerSpec{cs}
+ensures  err == nil ==> res.Mem() && res.GetChannelId() == channelId
+ensures  err != nil ==> err.ErrorMem()
+func NewDataStream(context ctx.T,
+	channelId string,
+	clientId string,
+	logReaderId string,
+	streamDataHandler func(msg *mgsContracts.AgentMessage) error,
+	cancelFlag task.CancelFlag,
+	ghost cs Calls) (res *DataStream, err error)
+
+// since `Send` internally acquires a mutex before sending, a `p` fraction of `datastream.Mem()` is sufficient
+requires log != nil && noPerm < p
+requires bytes.SliceMem(inputData)
+requires m == tm.pair(mgsContracts.payloadTypeTerm(payloadType), inputDataT)
+requires pl.token(t) && iospec.e_OutFact(t, rid, m) && by.gamma(inputDataT) == abs.Abs(inputData)
+preserves acc(datastream.Mem(), p) && acc(log.Mem(), _)
+ensures  err != nil ==> err.ErrorMem()
+ensures  err == nil ==> pl.token(t1) && t1 == old(iospec.get_e_OutFact_placeDst(t, rid, m))
+ensures  err != nil ==> t1 == t && pl.token(t) && iospec.e_OutFact(t, rid, m) && iospec.get_e_OutFact_placeDst(t, rid, m) == old(iospec.get_e_OutFact_placeDst(t, rid, m))
+func (datastream *DataStream) Send(log logger.T, payloadType mgsContracts.PayloadType, inputData []byte, ghost p perm, ghost t pl.Place, ghost rid tm.Term, ghost inputDataT tm.Term, ghost m tm.Term) (err error, ghost t1 pl.Place)
+
+// a fractional permission is sufficient as a lock is internally acquired
+requires noPerm < p
+preserves acc(datastream.Mem(), p)
+func (datastream *DataStream) GetStreamDataSequenceNumber(ghost p perm) int64
+
+decreases _
+requires acc(datastream.Mem(), _)
+pure func (datastream *DataStream) GetInstanceId() string
+
+decreases _
+requires acc(datastream.Mem(), _)
+pure func (datastream *DataStream) GetClientId() string
+
+decreases _
+requires acc(datastream.Mem(), _)
+pure func (datastream *DataStream) GetLogReaderId() string
+
+decreases _
+requires acc(datastream.Mem(), _)
+pure func (datastream *DataStream) GetChannelId() string
+
+decreases _
+requires acc(datastream.Mem(), _)
+pure func (datastream *DataStream) GetRegion() string
+
+decreases _
+requires acc(datastream.Mem(), _)
+pure func (datastream *DataStream) IsActive() bool
+
+// the cancel flag internally acquires a lock thus making read-only
+// permissions sufficient
+requires noPerm < p
+preserves acc(datastream.Mem(), p)
+func (datastream *DataStream) CancelSession(ghost p perm)
+
+// we assume that `Close` is thread-safe
+requires noPerm < p
+preserves acc(datastream.Mem(), p)
+ensures err != nil ==> err.ErrorMem()
+func (datastream *DataStream) Close(log logger.T, ghost p perm) (err error)
+
+// we assume that `PrepareToCloseChannel` is thread-safe
+requires noPerm < p
+preserves acc(datastream.Mem(), p)
+func (datastream *DataStream) PrepareToCloseChannel(log logger.T, ghost p perm)
+
+requires noPerm < p
+preserves acc(datastream.Mem(), p)
+ensures err == nil ==> service.Mem()
+ensures err != nil ==> err.ErrorMem()
+func (datastream *DataStream) GetKMSService(ghost p perm) (service *crypto.KMSService, err error) {
+	unfold acc(datastream.Mem(), p)
+	service, err = crypto.NewKMSService(datastream.context)
+	fold acc(datastream.Mem(), p)
+	return
+}

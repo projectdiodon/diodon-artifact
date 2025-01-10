@@ -1,0 +1,14 @@
+**/.DS_Store
+*.out
+*.log
+coverage.txt
+coverage.xml
+amazon-ssm-agent
+bin
+tmp
+errors.txt
+large-tests
+taint-report*
+*-report
+.emacs.desktop
+.idea

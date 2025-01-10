@@ -1,0 +1,105 @@
+{
+  "options": {
+    "log-level": 5,
+    "reports-dir": "example-dir",
+    "report-coverage": true,
+    "report-paths": true,
+    "report-no-callee-sites": true,
+    "coverage-filter": "argot.*",
+    "report-summaries": true,
+    "pkg-filter": "analysis.*",
+    "silence-warn": true,
+    "use-escape-analysis": true,
+    "analysis-options": {
+      "max-alarms": 16,
+      "unsafe-max-depth": 42,
+      "max-entrypoint-context-size": 20
+    }
+  },
+  "targets": [
+    {
+      "name": "foo",
+      "files": [
+        "cmd/main.go",
+        "cmd/foo.go"
+      ]
+    },
+    {
+      "name": "bar",
+      "files": [
+        "test/main.go",
+        "test/bar.go"
+      ]
+    }
+  ],
+  "pointer-config": {
+    "reflection": true,
+    "unsafe-no-effect-functions": [
+      "fmt.Errorf",
+      "fmt.Printf"
+    ]
+  },
+  "dataflow-problems": {
+    "user-specs": [
+      "example.json",
+      "example2.json"
+    ],
+    "field-sensitive-funcs": [
+      ".*"
+    ],
+    "summarize-on-demand": true,
+    "slicing": [
+      {
+        "tag": "slicing-problem-1",
+        "description": "A slicing problem",
+        "targets": [
+          "all"
+        ],
+        "backtracepoints": [
+          {
+            "method": "Foo",
+            "package": "bar"
+          }
+        ]
+      }
+    ],
+    "taint-tracking": [
+      {
+        "tag": "taint-tracking-problem-1",
+        "description": "A taint tracking problem.",
+        "severity": "HIGH",
+        "source-taints-args": true,
+        "targets": [
+          "foo",
+          "bar"
+        ],
+        "validators": [
+          {
+            "method": "Validate",
+            "package": "x"
+          }
+        ],
+        "sinks": [
+          {
+            "method": "Sink",
+            "package": "sensitiveDataManipulation"
+          }
+        ],
+        "sources": [
+          {
+            "type": "Data",
+            "field": "UserProvided"
+          }
+        ],
+        "sanitizers": [
+          {
+            "method": "Sanitize"
+          }
+        ],
+        "override-analysis-options": {
+          "unsafe-max-depth": 1
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,15 @@
+dataflow-problems:
+  field-sensitive-funcs:
+    - ".*"
+  taint-tracking:
+    -
+      sources:
+        - package: fmt
+          method: Sprintf
+        - package: "(intra-procedural)|(main)|(command-line-arguments)"
+          method: zoo
+      sinks:
+        - package: "(intra-procedural)|(main)|(command-line-arguments)"
+          method: sink[1-9]
+
+

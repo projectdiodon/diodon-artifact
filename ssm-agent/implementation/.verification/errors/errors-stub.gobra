@@ -1,0 +1,4 @@
+package errors
+
+ensures err != nil && err.ErrorMem()
+func New(text string) (err error)

@@ -1,0 +1,11 @@
+package fresh
+
+import "time"
+
+
+
+// fresh encoding ---------------
+type Fresh domain {
+    func fr_duration(duration time.Duration) Fresh
+}
+
