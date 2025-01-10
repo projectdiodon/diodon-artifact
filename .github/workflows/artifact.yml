@@ -1,0 +1,188 @@
+name: Artifact
+
+on:
+  push:
+
+env:
+  IMAGE_NAME: diodon-artifact
+  IMAGE_WORKFLOW_ARTIFACT_NAME: diodon-artifact-image
+
+jobs:
+  Build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      IMAGE_TAG: ${{ steps.output_step.outputs.IMAGE_TAG }}
+    steps:
+      - name: Create Image ID
+        run: |
+          REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "IMAGE_ID=ghcr.io/$REPO_OWNER/${{ env.IMAGE_NAME }}" >> $GITHUB_ENV
+
+      # repo checkout will only work if `app_token` provides access to the current repo and all its submodules.
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+
+      - name: Image version
+        run: |
+          VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
+          [ "$VERSION" == "main" ] && VERSION=latest
+          echo "IMAGE_TAG=${{ env.IMAGE_ID }}:$VERSION" >> $GITHUB_ENV
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          file: docker/Dockerfile
+          tags: ${{ env.IMAGE_TAG }}
+          labels: "runnumber=${{ github.run_id }}"
+          push: false
+          cache-from: type=gha, scope=${{ github.workflow }}
+          cache-to: type=gha, scope=${{ github.workflow }}
+          outputs: type=docker,dest=/tmp/image.tar
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.IMAGE_WORKFLOW_ARTIFACT_NAME }}
+          path: /tmp/image.tar
+          retention-days: 1
+
+      - name: Set job output
+        id: output_step
+        run: echo "IMAGE_TAG=${{ env.IMAGE_TAG }}" >> $GITHUB_OUTPUT
+
+  Test-DH:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    needs: Build
+    strategy:
+      # tests should not be stopped when they fail on one of the OSes:
+      fail-fast: false
+      matrix:
+        name:
+          [
+            "Verify DH protocol model",
+            "Verify DH core",
+            "Verify DH I/O independence",
+            "Verify DH I/O independence bugs",
+            "Verify DH core assumptions",
+            "Verify DH core assumptions bugs",
+          ]
+        include:
+          - name: "Verify DH protocol model"
+            command: "/gobra/dh/verify-model.sh"
+          - name: "Verify DH core"
+            command: "/gobra/dh/verify-core.sh"
+          - name: "Verify DH I/O independence"
+            command: "/gobra/dh/verify-io-independence.sh"
+          - name: "Verify DH I/O independence bugs"
+            command: "/gobra/dh/verify-io-independence-bug.sh"
+          - name: "Verify DH core assumptions"
+            command: "/gobra/dh/verify-core-assumptions.sh"
+          - name: "Verify DH core assumptions bugs"
+            command: "/gobra/dh/verify-core-assumptions-bug.sh"
+    timeout-minutes: 10
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.IMAGE_WORKFLOW_ARTIFACT_NAME }}
+          path: /tmp
+
+      - name: Load image
+        run: docker load --input /tmp/image.tar
+
+      - name: ${{ matrix.name }}
+        run: docker run --entrypoint "/bin/bash" ${{ needs.Build.outputs.IMAGE_TAG }} -c "cp -r /dh-orig/. dh/; cp -r /ssm-agent-orig/. ssm-agent/; ${{ matrix.command }}"
+
+  Test-SSM-Agent:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    needs: Build
+    strategy:
+      # tests should not be stopped when they fail on one of the OSes:
+      fail-fast: false
+      matrix:
+        name:
+          [
+            "Verify SSM Agent protocol model",
+            "Verify SSM Agent core",
+            "Verify SSM Agent I/O independence",
+            "Verify SSM Agent I/O independence bugs",
+            "Verify SSM Agent core assumptions",
+            "Verify SSM Agent core assumptions bugs",
+          ]
+        include:
+          - name: "Verify SSM Agent protocol model"
+            command: "/gobra/ssm-agent/verify-model.sh"
+          - name: "Verify SSM Agent core"
+            command: "/gobra/ssm-agent/verify-core.sh"
+          - name: "Verify SSM Agent I/O independence"
+            command: "/gobra/ssm-agent/verify-io-independence.sh"
+          - name: "Verify SSM Agent I/O independence bugs"
+            command: "/gobra/ssm-agent/verify-io-independence-bug.sh"
+          - name: "Verify SSM Agent core assumptions"
+            command: "/gobra/ssm-agent/verify-core-assumptions.sh"
+          - name: "Verify SSM Agent core assumptions bugs"
+            command: "/gobra/ssm-agent/verify-core-assumptions-bug.sh"
+    timeout-minutes: 20
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.IMAGE_WORKFLOW_ARTIFACT_NAME }}
+          path: /tmp
+
+      - name: Load image
+        run: docker load --input /tmp/image.tar
+
+      - name: ${{ matrix.name }}
+        run: docker run --entrypoint "/bin/bash" ${{ needs.Build.outputs.IMAGE_TAG }} -c "cp -r /dh-orig/. dh/; cp -r /ssm-agent-orig/. ssm-agent/; ${{ matrix.command }}"
+
+  Publish:
+    runs-on: ubuntu-latest
+    needs: [Build, Test-DH, Test-SSM-Agent]
+    timeout-minutes: 5
+    # set per-job GITHUB_TOKEN permissions such that pushing the Docker image will be possible:
+    permissions:
+      packages: write
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.IMAGE_WORKFLOW_ARTIFACT_NAME }}
+          path: /tmp
+
+      - name: Load image
+        run: docker load --input /tmp/image.tar
+
+      - name: Login to Github Packages
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push image
+        run: docker push ${{ needs.Build.outputs.IMAGE_TAG }}
+
+  Cleanup:
+    runs-on: ubuntu-latest
+    needs: Publish
+    if: always()
+    # set per-job GITHUB_TOKEN permissions such that deleting workflow artifacts will be possible:
+    permissions:
+      actions: write
+    steps:
+      - name: Delete artifact
+        uses: geekyeggo/delete-artifact@v5
+        with:
+          name: ${{ env.IMAGE_WORKFLOW_ARTIFACT_NAME }}
+          failOnError: false
