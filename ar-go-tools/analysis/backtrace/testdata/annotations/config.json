@@ -1,0 +1,20 @@
+{
+  "options": {
+    "log-level": 4,
+    "analysis-options": {
+      "unsafe-max-depth": 10
+    }
+  },
+  "dataflow-problems": {
+    "slicing": [
+      {
+        "tag": "test1",
+        "backtracepoints": [
+          {
+            "method": "notInSourceOtherMethodsAreAnnotated"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,8 @@
+options:
+  report-paths: true
+
+dataflow-problems:
+  slicing:
+    - backtracepoints:
+        - package: "os/exec"
+          method: "^Command$"

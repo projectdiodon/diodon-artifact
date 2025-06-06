@@ -1,0 +1,11 @@
+{
+    "gobraSettings.moduleName": "github.com/aws/amazon-ssm-agent",
+    "gobraSettings.includeDirs": [
+        ".verification",
+        "."
+    ],
+    "gobraSettings.buildVersion": "Nightly",
+    "gobraSettings.loglevel": "DEBUG",
+    "gobraSettings.autoVerify": false,
+    "gobraSettings.verifyPackage": true
+}

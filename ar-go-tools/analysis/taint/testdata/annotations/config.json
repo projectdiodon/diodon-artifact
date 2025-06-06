@@ -1,0 +1,50 @@
+{
+  "options": {
+    "log-level": 4,
+    "analysis-options": {
+      "unsafe-max-depth": 42
+    }
+  },
+  "dataflow-problems": {
+    "taint-tracking": [
+      {
+        "tag": "hybridDef",
+        "sinks": [
+          {
+            "package": "fmt",
+            "method": "Println"
+          }
+        ]
+      },
+      {
+        "tag": "foo",
+        "sources": [
+          {
+            "method": "sourceFoo"
+          }
+        ],
+        "sinks": [
+          {
+            "method": "sinkFoo"
+          }
+        ],
+        "override-analysis-options": {
+          "unsafe-max-depth": 1
+        }
+      },
+      {
+        "tag": "bar",
+        "sources": [
+          {
+            "method": "sourceFoo"
+          }
+        ],
+        "sinks": [
+          {
+            "method": "sinkBar"
+          }
+        ]
+      }
+    ]
+  }
+}

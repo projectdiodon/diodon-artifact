@@ -1,0 +1,9 @@
+dataflow-problems:
+  taint-tracking:
+    -
+      sources:
+        - method: "source"
+          package: "(panics)|(main|command-line-arguments)"
+      sinks:
+        - package: "(panics)|(main|command-line-arguments)"
+          method: "sink"
