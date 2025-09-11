@@ -1,3 +1,7 @@
+## ⚠️ This repository has permanently moved to [`viperproject/diodon-artifact`](https://github.com/viperproject/diodon-artifact)
+
+---
+
 # The Secrets Must Not Flow: Scaling Security Verification to Large Codebases
 
 [![SSM Agent Verification](https://github.com/projectdiodon/diodon-artifact/actions/workflows/artifact.yml/badge.svg?branch=main)](https://github.com/projectdiodon/diodon-artifact/actions/workflows/artifact.yml?query=branch%3Amain)
